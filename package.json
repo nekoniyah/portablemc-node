@@ -1,0 +1,16 @@
+{
+  "name": "portablemc-node",
+  "module": "index.js",
+  "main": "index.js",
+  "type": "module",
+  "types": "index.d.ts",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^6.0.3"
+  },
+  "scripts": {
+    "build": "tsc"
+  }
+}
