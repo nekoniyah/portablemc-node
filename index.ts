@@ -60,6 +60,9 @@ class PortableMC {
   ee = new EventEmitter();
   ready = false;
 
+  joinServerAddress: string | null = null;
+  joinServerPort: string | null = null;
+
   setVersion(version: string) {
     this.version = version;
     return this;
@@ -68,6 +71,11 @@ class PortableMC {
   setLoader(loader: "neoforge" | "fabric" | "forge" | "quilt") {
     this.loader = loader;
     return this;
+  }
+
+  setServer(address: string) {
+    this.joinServerAddress = address.split(":")[0]!;
+    this.joinServerPort = address.split(":")[1]!;
   }
 
   async init() {
@@ -137,7 +145,9 @@ class PortableMC {
    * // open the login page and paste the code
    */
   async login() {
-    const cp = this.spawn("auth login", { stdio: "pipe" });
+    const cp = this.spawn(`auth login --main-dir ${this.dataFolderName}`, {
+      stdio: "pipe",
+    });
 
     return new Promise((resolve: (code: string) => void) => {
       let code: string | null = null;
@@ -205,7 +215,7 @@ class PortableMC {
     else if (this.loader) id = this.loader + ":";
 
     const cp = this.spawn(
-      `start ${id} --main-dir ${this.dataFolderName} --username ${username} ${auth ? "--auth" : ""} ${jvmArg ? `--jvm-arg=${jvmArg}` : ""}`,
+      `start ${id} --main-dir ${this.dataFolderName} --username ${username} ${auth ? "--auth" : ""} ${jvmArg ? `--jvm-arg=${jvmArg}` : ""} ${this.joinServerAddress ? `--join-server ${this.joinServerAddress}` : ""} ${this.joinServerPort ? `--join-server-port ${this.joinServerPort}` : ""}`,
     );
 
     cp.on("message", (data) => {

@@ -53,6 +53,8 @@ class PortableMC {
     loader = null;
     ee = new EventEmitter();
     ready = false;
+    joinServerAddress = null;
+    joinServerPort = null;
     setVersion(version) {
         this.version = version;
         return this;
@@ -60,6 +62,10 @@ class PortableMC {
     setLoader(loader) {
         this.loader = loader;
         return this;
+    }
+    setServer(address) {
+        this.joinServerAddress = address.split(":")[0];
+        this.joinServerPort = address.split(":")[1];
     }
     async init() {
         if (fs.existsSync(this.binFilepath))
@@ -116,7 +122,9 @@ class PortableMC {
      * // open the login page and paste the code
      */
     async login() {
-        const cp = this.spawn("auth login", { stdio: "pipe" });
+        const cp = this.spawn(`auth login --main-dir ${this.dataFolderName}`, {
+            stdio: "pipe",
+        });
         return new Promise((resolve) => {
             let code = null;
             // Simulate enter
@@ -167,7 +175,7 @@ class PortableMC {
             id = this.version;
         else if (this.loader)
             id = this.loader + ":";
-        const cp = this.spawn(`start ${id} --main-dir ${this.dataFolderName} --username ${username} ${auth ? "--auth" : ""} ${jvmArg ? `--jvm-arg=${jvmArg}` : ""}`);
+        const cp = this.spawn(`start ${id} --main-dir ${this.dataFolderName} --username ${username} ${auth ? "--auth" : ""} ${jvmArg ? `--jvm-arg=${jvmArg}` : ""} ${this.joinServerAddress ? `--join-server ${this.joinServerAddress}` : ""} ${this.joinServerPort ? `--join-server-port ${this.joinServerPort}` : ""}`);
         cp.on("message", (data) => {
             this.ee.emit("log", data.toString());
         });

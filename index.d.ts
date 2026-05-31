@@ -11,8 +11,11 @@ declare class PortableMC {
     loader: "neoforge" | "fabric" | "forge" | "quilt" | null;
     ee: EventEmitter<any>;
     ready: boolean;
+    joinServerAddress: string | null;
+    joinServerPort: string | null;
     setVersion(version: string): this;
     setLoader(loader: "neoforge" | "fabric" | "forge" | "quilt"): this;
+    setServer(address: string): void;
     init(): Promise<this>;
     constructor(binDest: string, dataFolderName?: string, binFilepath?: string);
     private spawn;
