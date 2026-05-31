@@ -43,6 +43,10 @@ declare class PortableMC {
     on(event: "ready", listener: () => void): void;
     on(event: "log", listener: (data: string) => void): void;
     on(event: "close", listener: (code: number) => void): void;
+    on(event: "authenticated", listener: (accounts: {
+        username: string;
+        uuid: string;
+    }[]) => void): void;
 }
 export default PortableMC;
 export { PortableMC };

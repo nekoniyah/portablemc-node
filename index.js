@@ -121,12 +121,19 @@ class PortableMC {
             let code = null;
             // Simulate enter
             cp.stdin?.write("\n");
-            cp.stdout?.on("data", (data) => {
+            cp.stdout?.on("data", async (data) => {
                 let findCodeRegex = /the code (\w+)/g;
                 const match = findCodeRegex.exec(data.toString());
-                if (match)
+                if (match) {
                     code = match[1];
-                resolve(code);
+                    resolve(code);
+                }
+                const authenticatedRegex = /Authenticated account as/;
+                const isAuthenticated = authenticatedRegex.test(data.toString());
+                if (isAuthenticated) {
+                    this.ready = true;
+                    this.ee.emit("authenticated", await this.getAccounts());
+                }
             });
         });
     }

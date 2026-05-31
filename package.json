@@ -3,7 +3,9 @@
   "module": "index.js",
   "main": "index.js",
   "type": "module",
+  "version": "1.0.1",
   "types": "index.d.ts",
+  "description": "Use portablemc in typescript.",
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -12,5 +14,14 @@
   },
   "scripts": {
     "build": "tsc"
-  }
+  },
+  "keywords": [
+    "portablemc",
+    "portable",
+    "mc",
+    "port",
+    "minecraft",
+    "typescript",
+    "typed"
+  ]
 }

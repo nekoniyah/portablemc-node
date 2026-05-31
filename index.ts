@@ -145,12 +145,22 @@ class PortableMC {
 
       cp.stdin?.write("\n");
 
-      cp.stdout?.on("data", (data) => {
+      cp.stdout?.on("data", async (data) => {
         let findCodeRegex = /the code (\w+)/g;
         const match = findCodeRegex.exec(data.toString());
-        if (match) code = match[1]!;
 
-        resolve(code!);
+        if (match) {
+          code = match[1]!;
+          resolve(code!);
+        }
+
+        const authenticatedRegex = /Authenticated account as/;
+        const isAuthenticated = authenticatedRegex.test(data.toString());
+
+        if (isAuthenticated) {
+          this.ready = true;
+          this.ee.emit("authenticated", await this.getAccounts());
+        }
       });
     });
   }
@@ -212,6 +222,10 @@ class PortableMC {
   on(event: "ready", listener: () => void): void;
   on(event: "log", listener: (data: string) => void): void;
   on(event: "close", listener: (code: number) => void): void;
+  on(
+    event: "authenticated",
+    listener: (accounts: { username: string; uuid: string }[]) => void,
+  ): void;
   on(event: string, listener: (...args: any[]) => void) {
     this.ee.on(event, listener);
 
