@@ -145,8 +145,9 @@ class PortableMC {
    * // open the login page and paste the code
    */
   async login() {
-    const cp = this.spawn(`auth login --main-dir ${this.dataFolderName}`, {
+    let cp = this.spawn(`auth --main-dir=${this.dataFolderName} login`, {
       stdio: "pipe",
+      shell: true,
     });
 
     return new Promise((resolve: (code: string) => void) => {
@@ -178,10 +179,13 @@ class PortableMC {
   async getAccounts() {
     return new Promise(
       (resolve: (accounts: { username: string; uuid: string }[]) => void) => {
-        let ret: { username: string; uuid: string }[] = [];
-
-        let cp = this.spawn("auth list", { stdio: "pipe" });
+        let cp = this.spawn(`auth --main-dir=${this.dataFolderName} list`, {
+          stdio: "pipe",
+          shell: true,
+        });
         cp.stdout?.on("data", (msg: Buffer, sender) => {
+          let ret: { username: string; uuid: string }[] = [];
+
           const lines = msg.toString().split("\n");
           lines.pop();
           lines.pop();
