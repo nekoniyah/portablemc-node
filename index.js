@@ -2,8 +2,8 @@ import os from "os";
 import fs from "fs";
 import path from "path";
 import EventEmitter from "events";
-import { ChildProcess, spawn } from "child_process";
-const PORTABLEMC_BIN_REPO_URL = "https://github.com/nekoniyah/ciel-launcher/releases/download/v1-bin";
+import { spawn } from "child_process";
+const PORTABLEMC_BIN_REPO_URL = "https://github.com/nekoniyah/portablemc-node/releases/download/bin";
 const WINDOWS_NAME = "portablemc.exe";
 const LINUX_NAME = "portablemc_linux";
 const MACOS_NAME = "portablemc_mac";
@@ -66,6 +66,7 @@ class PortableMC {
     setServer(address) {
         this.joinServerAddress = address.split(":")[0];
         this.joinServerPort = address.split(":")[1];
+        return this;
     }
     async init() {
         if (fs.existsSync(this.binFilepath))
@@ -77,7 +78,10 @@ class PortableMC {
         }
         return this;
     }
-    constructor(binDest, dataFolderName = "data", binFilepath = getPortableMcBinPath(binDest)) {
+    onReady(cb) {
+        this.ee.on("ready", cb);
+    }
+    constructor(binDest, dataFolderName = binDest, binFilepath = getPortableMcBinPath(binDest)) {
         this.binDest = binDest;
         this.dataFolderName = dataFolderName;
         this.binFilepath = binFilepath;
@@ -92,36 +96,33 @@ class PortableMC {
     }) {
         return spawn(this.binFilepath, args.split(" "), params);
     }
-    /**
-     *
-     * Prepare the launcher to start a game.
-     *
-     * @param username offline or premium username (note: premium needs a username to select the right account.)
-     * @param auth if true, it will require to have already logged in with the account. If else, it will use offline mode.
-     */
-    async prepare(username, auth = false) {
-        return {
-            start: async (jvmArg) => {
-                if (this.ready)
-                    return this._startIfReady(username, auth, jvmArg);
-                else
-                    return new Promise((resolve) => {
-                        this.on("ready", () => {
-                            resolve(this._startIfReady(username, auth, jvmArg));
-                        });
-                    });
-            },
+    start(username, options = {
+        auth: false,
+    }) {
+        const startWhenReady = () => {
+            const cp = this._startIfReady(username, options.auth, options.jvmArg);
+            if (options.onClose) {
+                cp.on("exit", () => options.onClose);
+                cp.on("close", () => options.onClose);
+            }
         };
+        if (this.ready)
+            startWhenReady();
+        else
+            this.onReady(startWhenReady);
     }
     /**
      * Opens the login page and returns the code requested by microsoft to authenticate
      * @returns the code generated, and required by microsoft on the login page.
      *
      * @example
-     * const code = await portablemc.login();
-     * // open the login page and paste the code
+     * function onAuth() {
+     *    // Do stuff when user successfully log in.
+     * }
+     * const code = await portablemc.login(onAuth);
+     * // opens the login page to paste the code
      */
-    async login() {
+    async login(authenticatedCallback) {
         let cp = this.spawn(`auth --main-dir=${this.dataFolderName} login`, {
             stdio: "pipe",
             shell: true,
@@ -141,7 +142,7 @@ class PortableMC {
                 const isAuthenticated = authenticatedRegex.test(data.toString());
                 if (isAuthenticated) {
                     this.ready = true;
-                    this.ee.emit("authenticated", await this.getAccounts());
+                    authenticatedCallback();
                 }
             });
         });
@@ -187,10 +188,6 @@ class PortableMC {
             this.ee.emit("close", code);
         });
         return cp;
-    }
-    on(event, listener) {
-        this.ee.on(event, listener);
-        return this;
     }
 }
 export default PortableMC;

@@ -4,17 +4,22 @@ A lightweight TypeScript/JavaScript wrapper for the [portablemc](https://github.
 
 It automatically handles downloading and managing the underlying `portablemc` binary for Windows, Linux, and macOS so you don't have to bundle it or require your users to install it manually.
 
+> [!WARNING]
+> **Versions 1.0.3 and older are deprecated and no longer work.** Please make sure you are using the latest version.
+
 ## Features
 
-- 📦 **Zero Manual Setup:** Automatically downloads the correct platform binary (`.exe` on Windows, native binaries on Unix).
-- 🔒 **Type Safe:** Complete TypeScript definitions out of the box.
-- 🖥️ **Cross-Platform:** Automatically applies execute permissions (`chmod 0755`) on Linux & macOS.
+- **Cross-Platform**: Automatically detects, downloads, and sets permissions for Windows, Linux, and macOS binaries.
+- **Zero Manual Setup**: Downloads the required binary on initialization if it doesn't exist.
+- **Authentication Support**: Seamless Microsoft/Minecraft login handling, exposing the required OAuth device codes directly via code.
+- **Account Management**: List locally cached Microsoft accounts and their UUIDs.
+- **Flexible Launching**: Supports specific vanilla versions, mod loaders (Forge, Fabric, NeoForge, Quilt), custom JVM arguments, and auto-joining servers.
 
 ---
 
 ## Installation
 
-Install the package via your preferred package manager:
+Install the package via npm:
 
 ```bash
 npm install portablemc-node
@@ -23,44 +28,38 @@ npm install portablemc-node
 
 ---
 
-## Usage
+## Quick Start
+
+Here is a basic example of how to initialize the library and launch a specific Minecraft version.
 
 ```typescript
-import PortableMC from "portablemc-node";
+import { PortableMC } from "portablemc-node";
 import path from "path";
 
 async function main() {
-  const binDirectory = path.join(process.cwd(), "bin");
-  const dataDirectory = path.join(process.cwd(), "minecraft_data");
+  // Define where to store the portablemc binary and Minecraft files
+  const storageDir = path.join(process.cwd(), ".minecraft-data");
 
-  // 1. Initialize PortableMC (Downloads the binary to 'bin' if it doesn't exist)
-  const pmc = new PortableMC(binDirectory, dataDirectory);
+  const launcher = new PortableMC(storageDir);
 
-  // Set version or loader configurations if needed before calling init
-  pmc.setVersion("1.20.4");
-  pmc.setLoader("neoforge");
+  // 1. Initialize (downloads the binary if it's missing)
+  console.log("Initializing launcher...");
+  await launcher.init();
 
-  await pmc.init();
+  // 2. Configure game settings
+  launcher
+    .setVersion("1.20.4")
+    .setLoader("fabric") // Supports: 'neoforge' | 'fabric' | 'forge' | 'quilt'
+    .setServer("play.example.com:25565"); // Optional: Auto-join server on launch
 
-  // 2. Bind event listeners to monitor launch logs
-  pmc.on("log", (data) => console.log(`[Minecraft]: ${data}`));
-  pmc.on("close", (code) => console.log(`Game closed with exit code: ${code}`));
-
-  // 3. Authenticate (If needed, get the Microsoft login code)
-  // const code = await pmc.login();
-  // console.log(`Please visit Microsoft and enter code: ${code}`);
-
-  // 4. List accounts
-  const accounts = await pmc.getAccounts();
-  console.log("Logged in accounts:", accounts);
-
-  // 5. Prepare and start the game process
-  // prepare(username, usePremiumAuth)
-  const launcher = await pmc.prepare("MyUsername", false);
-
-  // start(optionalJvmArgs)
-  const childProcess = await launcher.start("-Xmx4G");
-  console.log(`Game running under PID: ${childProcess.pid}`);
+  // 3. Start the game
+  console.log("Launching Minecraft...");
+  launcher.start("PlayerName", {
+    auth: false, // Set to true if using an authenticated account
+    onClose: () => {
+      console.log("Game closed!");
+    },
+  });
 }
 
 main().catch(console.error);
@@ -68,53 +67,83 @@ main().catch(console.error);
 
 ---
 
+## Authentication Flow
+
+To launch the game with an official Microsoft account, you must complete the device login flow.
+
+```typescript
+const launcher = new PortableMC("./mincraft-data");
+await launcher.init();
+
+// Start the login process
+const code = await launcher.login(() => {
+  console.log("Successfully authenticated with Microsoft!");
+
+  // Now you can safely start the game with auth enabled
+  launcher.setVersion("1.20.4").start("YourRegisteredUsername", { auth: true });
+});
+
+// Display this code to your user so they can link their account
+console.log(`Please go to https://microsoft.com/link and enter code: ${code}`);
+```
+
+---
+
 ## API Reference
 
-### `PortableMC` Class
+### `new PortableMC(binDest, dataFolderName?, binFilepath?)`
 
-#### `constructor(binDest: string, dataFolderName?: string)`
+Creates a new instance of the PortableMC wrapper.
 
-- `binDest`: The folder path where the downloaded `portablemc` binary will be placed.
-- `dataFolderName` _(Optional)_: The folder name where Minecraft data files (mods, saves, etc.) will reside. Defaults to `"data"`.
+| Parameter        | Type     | Required | Description                                                                         |
+| ---------------- | -------- | -------- | ----------------------------------------------------------------------------------- |
+| `binDest`        | `string` | **Yes**  | The directory path where the `portablemc` executable will be downloaded and stored. |
+| `dataFolderName` | `string` | No       | The directory path for Minecraft's game data (defaults to `binDest`).               |
+| `binFilepath`    | `string` | No       | Custom exact path to the binary (auto-generated by default).                        |
 
-#### `version: string | null`
+### Instance Methods
 
-Set this to your target Minecraft version (e.g., `"1.20.4"`) before launching.
+#### `.init(): Promise<this>`
 
-#### `loader: 'neoforge' | 'fabric' | 'forge' | 'quilt' | null`
+Downloads the correct platform binary to `binDest` if it doesn't already exist and applies executable permissions (`chmod +x`) on Unix systems. Returns the class instance for chaining.
 
-Set this to your target mod loader before launching.
+#### `.setVersion(version: string): this`
 
-#### `init(): Promise<PortableMC>`
+Sets the target Minecraft version (e.g., `"1.20.4"`, `"1.16.5"`).
 
-Verifies local presence of the binary or fetches it from upstream mirrors. Resolves when the environment is ready.
+#### `.setLoader(loader: 'neoforge' | 'fabric' | 'forge' | 'quilt'): this`
 
-#### `login(): Promise<string>`
+Sets the mod loader to use.
 
-Spawns an interactive verification terminal channel. Resolves with the Microsoft Device Authentication Code string.
+#### `.setServer(address: string): this`
 
-#### `getAccounts(): Promise<Array<{ username: string; uuid: string }>>`
+Pass a server address (e.g., `"localhost:25565"` or `"mc.hypixel.net"`). The game will automatically attempt to connect to this server upon loading.
 
-Parses existing offline/online saved profiles in your active data directory.
+#### `.start(username: string, options?: LaunchOptions): void`
 
-#### `prepare(username: string, auth?: boolean): Promise<{ start: (jvmArg?: string) => Promise<ChildProcess> }>`
+Spawns the Minecraft process. If the binary isn't ready yet, it will queue execution until the `ready` event fires.
 
-Configures launching credentials.
+```typescript
+type LaunchOptions = {
+  auth?: boolean; // Use Microsoft authentication profile (Default: false)
+  jvmArg?: string; // Additional custom JVM arguments
+  onClose?: () => void; // Callback function fired when the game process exits
+};
+```
 
-- `username`: Profile string.
-- `auth`: If `true`, requires Microsoft account token parsing. If `false`, launches in offline/LAN mode.
-- Returns an object containing the `.start()` initialization function which resolves to a native Node.js `ChildProcess`.
+#### `.login(authenticatedCallback: () => void): Promise<string>`
 
-#### Events (`pmc.on()`)
+Triggers the Microsoft device authentication step.
 
-| Event Name | Parameter Type           | Description                                                             |
-| ---------- | ------------------------ | ----------------------------------------------------------------------- |
-| `"ready"`  | `() => void`             | Fires when the binary environment finishes initial download sequences.  |
-| `"log"`    | `(data: string) => void` | Fires on standard operational standard logs generated inside the shell. |
-| `"close"`  | `(code: number) => void` | Fires on application termination.                                       |
+- **Returns**: A `Promise<string>` containing the short verification code your user needs to enter on Microsoft's login activation page.
+- **Callback**: `authenticatedCallback` is executed once the login process detects a successful token receipt.
+
+#### `.getAccounts(): Promise<{ username: string; uuid: string }[]>`
+
+Parses and returns an array of all locally saved profiles/accounts currently stored in the data directory.
 
 ---
 
 ## License
 
-MIT
+This project wrapper is MIT licensed. The underlying tool `portablemc` belongs to its respective owners.
